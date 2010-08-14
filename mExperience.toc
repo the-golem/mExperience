@@ -1,0 +1,15 @@
+## Interface: 30300
+## Title: mExperience
+## Notes: Configurable Alternate XP Bar
+## Author: the-golem/Mistblade
+## Version: 1.0
+## SavedVariables: mExperienceDB
+## OptionalDeps: Ace3
+
+#@no-lib-strip@
+embeds.xml
+#@end-no-lib-strip@
+
+localization\enUS.lua
+
+mExperience.lua
