@@ -1,20 +1,64 @@
 --addon local variables
 local bg, normal, rested, text, db;
-local xpDisplayNormalFmt = "XP  %d / %d  (%d%%)";	--Normal / Max (percent)
-local xpDisplayRestFmt = "XP  %d / %d  (%d%%)  [%d%% Rest]";
+local XP_FMT_STRING = "XP  %d / %d  (%d%%)"
+local XP_REST_FMT_STRING = "XP  %d / %d  (%d%%)  [+%d%% Rest]"
 -- lib local variables
 local L = LibStub("AceLocale-3.0"):GetLocale("mExperience");
-local LSM = LibStub("LibSharedMedia-3.0");
-local config = LibStub("AceConfig-3.0");
-local dialog = LibStub("AceConfigDialog-3.0");
 
 --
 local mExperience = LibStub("AceAddon-3.0"):NewAddon("mExperience", "AceEvent-3.0");
-local mxpFrame = CreateFrame("Frame", "mExperienceBaseFrame", UIParent);
+local mXP = CreateFrame("Frame", "mExperienceBaseFrame", UIParent);
 
 function mExperience:OnInitialize()
-    -- mExperience Default Options
+    -- mExperience Default Settings
     ------------------------------
+    self:RegisterDefaults();
+
+    -- mExperience Options Table
+    -----------------------------
+    self:RegisterOptions();
+
+    -- LibDataBroker Launcher
+    ---------------------------
+    self:RegisterLauncher();
+
+    -- create the frame
+    ---------------------------
+    mXP:Load();
+end
+
+function mXP:Load()
+    self:SetFrameStrata("BACKGROUND");
+    self:SetFrameLevel("0");
+    self:SetClampedToScreen(true);
+    self:EnableMouse(true)
+
+    bg = self:CreateTexture(nil, "BACKGROUND");
+	bg:SetAllPoints();
+
+	rested = CreateFrame("StatusBar", nil, mXP);
+
+    rested:SetFrameLevel("1")
+	rested:SetAllPoints();
+
+	normal = CreateFrame("StatusBar", nil, mXP);
+    normal:SetFrameLevel("2")
+    normal:SetAllPoints();
+
+	text = normal:CreateFontString();
+	text:SetPoint("CENTER");
+end
+
+function mExperience:OnEnable()
+	self:RegisterEvent('UPDATE_EXHAUSTION', "UpdateExperience");
+	self:RegisterEvent('PLAYER_XP_UPDATE', "UpdateExperience");
+	self:RegisterEvent('PLAYER_LEVEL_UP', "UpdateExperience");
+
+	self:UpdateBarSettings()
+	self:UpdateExperience()
+end
+
+function mExperience:RegisterDefaults()
     local defaults = {
         profile = {
             scale = 1,
@@ -34,15 +78,18 @@ function mExperience:OnInitialize()
             fontName = "Friz Quadrata TT",
             fontSize = 10,
             fontOutline = "OUTLINE",
-            isfontVisible = true,
-            showOnHover = false,
+            alwaysShowText = true,
+            showTextOnHover = true,
         },
     };
 	self.db = LibStub("AceDB-3.0"):New("mExperienceDB", defaults, true);
 	db = self.db;
+end
 
-    -- mExperience Options Table
-    -----------------------------
+function mExperience:RegisterOptions()
+	local LSM = LibStub('LibSharedMedia-3.0')
+    local config = LibStub("AceConfig-3.0");
+    local dialog = LibStub("AceConfigDialog-3.0");
     local options = {
         name = "mExperience",
         desc = L["A configurable alternate XP bar."],
@@ -161,16 +208,16 @@ function mExperience:OnInitialize()
             },
 
             hFont = { name = L["Font Options"], type = "header", order = 230 },
-            isFontVisible = {
+            alwaysShowText = {
                 name = L["Always Show XP Text"],
                 type = "toggle",
                 order = 240,
                 },
-            showOnHover = {
+            showTextOnHover = {
                 name = L["Show Text on Hover"],
                 type = "toggle",
                 order = 245,
-                disabled = function() return not db.profile.isFontVisible end,
+                disabled = function() return db.profile.alwaysShowText end,
                 },
             fontName = {
                 name = L["Font Face"],
@@ -178,7 +225,7 @@ function mExperience:OnInitialize()
                 dialogControl = 'LSM30_Font', --Select your widget here
                 order = 250,
                 values = LSM:HashTable("font"),
-                disabled = function() return not db.profile.isFontVisible end,
+                disabled = function() return not db.profile.alwaysShowText end,
             },
             fontSize = {
                 name = L["Font Size"],
@@ -186,7 +233,7 @@ function mExperience:OnInitialize()
                 order = 260,
                 step = 1,
                 min = 6, max = 48,
-                disabled = function() return not db.profile.isFontVisible end,
+                disabled = function() return not db.profile.alwaysShowText end,
             },
             fontOutline = {
                 name = L["Font Outline"],
@@ -196,19 +243,19 @@ function mExperience:OnInitialize()
                         [""] = L["None"],
                         ["OUTLINE"] = L["Outline"],
                         ["THICKOUTLINE"] = L["Thick Outline"]},
-                disabled = function() return not db.profile.isFontVisible end,
+                disabled = function() return not db.profile.alwaysShowText end,
             },
         },
     };
     config:RegisterOptionsTable("mExperience", options )
     dialog:AddToBlizOptions("mExperience", "mExperience")
         _G["SLASH_MXP1"] = "/mxp"
-        _G["SLASH_MXP2"] = "/mexp"        
+        _G["SLASH_MXP2"] = "/mexp"
         _G["SLASH_MXP3"] = "/mexperience"
         _G.SlashCmdList["MXP"] = function() InterfaceOptionsFrame_OpenToCategory("mExperience") end
+end
 
-    -- LibDataBroker Launcher
-    ---------------------------
+function mExperience:RegisterLauncher()
     local mDateBlock = LibStub("LibDataBroker-1.1"):NewDataObject("mExperience", {
         type = "launcher",
         icon = "Interface\\Icons\\Achievement_PVP_A_15",
@@ -220,39 +267,6 @@ function mExperience:OnInitialize()
             end
         end,
     })
-
-    -- create the frame
-    ---------------------------
-    mxpFrame:SetFrameStrata("BACKGROUND");
-    mxpFrame:SetFrameLevel("0");
-    mxpFrame:SetClampedToScreen(true);
-    mxpFrame:EnableMouse(true)
-
-    bg = mxpFrame:CreateTexture(nil, "BACKGROUND");
-	bg:SetAllPoints();
-
-	rested = CreateFrame("StatusBar", nil, mxpFrame);
-    rested:SetFrameStrata("BACKGROUND");
-    
-    rested:SetFrameLevel("1")
-	rested:SetAllPoints();
-
-	normal = CreateFrame("StatusBar", nil, mxpFrame);
-    normal:SetFrameStrata("BACKGROUND");    
-    normal:SetFrameLevel("2")
-    normal:SetAllPoints();
-
-	text = normal:CreateFontString();
-	text:SetPoint("CENTER");
-end
-
-function mExperience:OnEnable()
-	self:RegisterEvent('UPDATE_EXHAUSTION', "UpdateExperience");
-	self:RegisterEvent('PLAYER_XP_UPDATE', "UpdateExperience");
-	self:RegisterEvent('PLAYER_LEVEL_UP', "UpdateExperience");
-
-	self:UpdateBarSettings()
-	self:UpdateExperience()
 end
 
 function mExperience:UpdateColors()
@@ -276,6 +290,7 @@ function mExperience:UpdateColors()
                                   db.profile.restedColor.a
                                 );
 end
+
 function mExperience:UpdateExperience()
     local max = UnitXPMax("player");
     local norm = UnitXP("player");
@@ -289,57 +304,72 @@ function mExperience:UpdateExperience()
     normal:SetMinMaxValues(0, max);
     normal:SetValue(norm);
 
-    text:SetFormattedText(xpDisplayNormalFmt, norm, max, pct);
+    text:SetFormattedText(XP_FMT_STRING, norm, max, pct);
 
     --update colors if necessary
     ---------------------------
     mExperience:UpdateColors();
+
+    rested:GetStatusBarTexture():SetTexCoord(0, (norm+rest > max and 1 or (norm+rest)/max), 0, 1)
+    normal:GetStatusBarTexture():SetTexCoord(0, pct/100, 0, 1)
+end
+
+function mExperience:UpdateText()
+	local LSM = LibStub('LibSharedMedia-3.0')
     
-    rested:GetStatusBarTexture():SetTexCoord(0, (norm+rest > max and 1 or (norm+rest)/max), 0, 1)        
-    normal:GetStatusBarTexture():SetTexCoord(0, pct/100, 0, 1)    
+    local name = LSM:Fetch("font", db.profile.fontName);
+	text:SetFont(name, db.profile.fontSize, db.profile.fontOutline);
+
+    --- Always Show XP Text
+    ---------------------------
+    if db.profile.alwaysShowText then text:Show() else text:Hide(); end
+
+    --- Hide XP Text, but Show on Hover
+    ---------------------------
+    if db.profile.showTextOnHover and not db.profile.alwaysShowText then
+        mXP:SetScript("OnEnter", function() if not db.profile.alwaysShowText then text:Show() else return end end);
+        mXP:SetScript("OnLeave", function() if not db.profile.alwaysShowText then text:Hide() else return end end);
+    end;
+end
+
+function mExperience:UpdateTexture()
+	local LSM = LibStub('LibSharedMedia-3.0')
+	
+	local texture = (LSM and LSM:Fetch('statusbar', db.profile.texture)) or DEFAULT_STATUSBAR_TEXTURE
+	normal:SetStatusBarTexture(texture)
+	rested:SetStatusBarTexture(texture)
+	bg:SetTexture(texture)
+    bg:SetVertexColor(0.2, 0.2, 0.2, 0.5)    
+end
+
+function mExperience:UpdateLayout()
+	mXP:SetWidth(db.profile.width);
+	mXP:SetHeight(db.profile.height);
+	mXP:ClearAllPoints();
+    mXP:SetPoint(db.profile.anchor,
+                      UIParent,
+                      db.profile.anchor,
+                      db.profile.xOffset,
+                      db.profile.yOffset );
+	mXP:SetAlpha(db.profile.alpha);
+	mXP:SetScale(db.profile.scale);
 end
 
 function mExperience:UpdateBarSettings()	--Stuff that really only needs to be touched when some settings change.
     --Height & Width & Location
     ---------------------------
-	mxpFrame:SetWidth(db.profile.width);
-	mxpFrame:SetHeight(db.profile.height);
-	mxpFrame:ClearAllPoints();
-    mxpFrame:SetPoint(db.profile.anchor,
-                      UIParent,
-                      db.profile.anchor,
-                      db.profile.xOffset,
-                      db.profile.yOffset );
-
-	mxpFrame:SetAlpha(db.profile.alpha);
-	mxpFrame:SetScale(db.profile.scale);
-
+    self:UpdateLayout();
 	--Texture
     ---------------------------
-    local texture = LSM:Fetch("statusbar", db.profile.texture)
-	bg:SetTexture(0, 0, 0, 0.25);	--Basic Background Color
-	normal:SetStatusBarTexture(texture)
-	rested:SetStatusBarTexture(texture)
-
+    self:UpdateTexture();
+    
 	--Colors
     ---------------------------
-    mExperience:UpdateColors()
+    self:UpdateColors();
 
     --Fonts
     ---------------------------
-    local name = LSM:Fetch("font", db.profile.fontName);
-	text:SetFont(name, db.profile.fontSize, db.profile.fontOutline);
-
-    --- Hide XP Text
-    ---------------------------
-    local fontAlpha = not db.profile.isFontVisible and 0 or 1;
-    text:SetAlpha(fontAlpha);
-
-    --- Hide XP Text, but Show on Hover
-    ---------------------------
-    if db.profile.showOnHover and db.profile.isFontVisible then text:SetAlpha(0) end;
-    mxpFrame:SetScript("OnEnter", function() if db.profile.showOnHover then text:SetAlpha(1) else return end end);
-    mxpFrame:SetScript("OnLeave", function() if db.profile.showOnHover then text:SetAlpha(0) else return end end);
+    self:UpdateText();
 
     --Redraw XP Statusbars
     ---------------------------
@@ -349,9 +379,9 @@ function mExperience:UpdateBarSettings()	--Stuff that really only needs to be to
 
     --Allow for Free Postioning with the Mouse
     ------------------------------------------
-    if not db.profile.locked then        
-        mxpFrame:SetScript("OnMouseDown", function(self) self:SetMovable(true); self:StartMoving(); end )
-        mxpFrame:SetScript(
+    if not db.profile.locked then
+        mXP:SetScript("OnMouseDown", function(self) self:SetMovable(true); self:StartMoving(); end )
+        mXP:SetScript(
             "OnMouseUp",
             function(self)
                 self:StopMovingOrSizing();
@@ -364,3 +394,4 @@ function mExperience:UpdateBarSettings()	--Stuff that really only needs to be to
         )
     end;
 end
+
