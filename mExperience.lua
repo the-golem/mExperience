@@ -4,6 +4,7 @@ local XP_FMT_STRING = "XP  %d / %d  (%d%%)"
 local XP_REST_FMT_STRING = "XP  %d / %d  (%d%%)  [+%d%% Rest]"
 -- lib local variables
 local L = LibStub("AceLocale-3.0"):GetLocale("mExperience");
+local LSM = LibStub('LibSharedMedia-3.0')
 
 --
 local mExperience = LibStub("AceAddon-3.0"):NewAddon("mExperience", "AceEvent-3.0");
@@ -34,28 +35,28 @@ function mXP:Load()
     self:EnableMouse(true)
 
     bg = self:CreateTexture(nil, "BACKGROUND");
-	bg:SetAllPoints();
+    bg:SetAllPoints();
 
-	rested = CreateFrame("StatusBar", nil, mXP);
+    rested = CreateFrame("StatusBar", nil, mXP);
 
     rested:SetFrameLevel("1")
-	rested:SetAllPoints();
+    rested:SetAllPoints();
 
-	normal = CreateFrame("StatusBar", nil, mXP);
+    normal = CreateFrame("StatusBar", nil, mXP);
     normal:SetFrameLevel("2")
     normal:SetAllPoints();
 
-	text = normal:CreateFontString();
-	text:SetPoint("CENTER");
+    text = normal:CreateFontString();
+    text:SetPoint("CENTER");
 end
 
 function mExperience:OnEnable()
-	self:RegisterEvent('UPDATE_EXHAUSTION', "UpdateExperience");
-	self:RegisterEvent('PLAYER_XP_UPDATE', "UpdateExperience");
-	self:RegisterEvent('PLAYER_LEVEL_UP', "UpdateExperience");
+    self:RegisterEvent('UPDATE_EXHAUSTION', "UpdateExperience");
+    self:RegisterEvent('PLAYER_XP_UPDATE', "UpdateExperience");
+    self:RegisterEvent('PLAYER_LEVEL_UP', "UpdateExperience");
 
-	self:UpdateBarSettings()
-	self:UpdateExperience()
+    self:UpdateBarSettings()
+    self:UpdateExperience()
 end
 
 function mExperience:RegisterDefaults()
@@ -82,12 +83,12 @@ function mExperience:RegisterDefaults()
             showTextOnHover = true,
         },
     };
-	self.db = LibStub("AceDB-3.0"):New("mExperienceDB", defaults, true);
-	db = self.db;
+    self.db = LibStub("AceDB-3.0"):New("mExperienceDB", defaults, true);
+    db = self.db;
 end
 
 function mExperience:RegisterOptions()
-	local LSM = LibStub('LibSharedMedia-3.0')
+    local LSM = LibStub('LibSharedMedia-3.0')
     local config = LibStub("AceConfig-3.0");
     local dialog = LibStub("AceConfigDialog-3.0");
     local options = {
@@ -296,7 +297,7 @@ function mExperience:UpdateExperience()
     local norm = UnitXP("player");
     local rest = GetXPExhaustion() or 0;
     local pct = math.floor(100*(norm/max)+0.5);
-    local restPercent = math.floor(100*(rest/max)+0.5);
+    local restPct = math.floor(100*(rest/max)+0.5);
 
     rested:SetMinMaxValues(0, max);
     rested:SetValue(norm+rest);
@@ -304,8 +305,13 @@ function mExperience:UpdateExperience()
     normal:SetMinMaxValues(0, max);
     normal:SetValue(norm);
 
-    text:SetFormattedText(XP_FMT_STRING, norm, max, pct);
-
+    --update numerical XP display
+    ---------------------------
+    if rest == nil then
+        text:SetFormattedText(XP_REST_FMT_STRING, norm, max, pct, restPct);
+    else
+        text:SetFormattedText(XP_FMT_STRING, norm, max, pct);
+    end
     --update colors if necessary
     ---------------------------
     mExperience:UpdateColors();
@@ -315,10 +321,8 @@ function mExperience:UpdateExperience()
 end
 
 function mExperience:UpdateText()
-	local LSM = LibStub('LibSharedMedia-3.0')
-    
     local name = LSM:Fetch("font", db.profile.fontName);
-	text:SetFont(name, db.profile.fontSize, db.profile.fontOutline);
+    text:SetFont(name, db.profile.fontSize, db.profile.fontOutline);
 
     --- Always Show XP Text
     ---------------------------
@@ -333,37 +337,35 @@ function mExperience:UpdateText()
 end
 
 function mExperience:UpdateTexture()
-	local LSM = LibStub('LibSharedMedia-3.0')
-	
-	local texture = (LSM and LSM:Fetch('statusbar', db.profile.texture)) or DEFAULT_STATUSBAR_TEXTURE
-	normal:SetStatusBarTexture(texture)
-	rested:SetStatusBarTexture(texture)
-	bg:SetTexture(texture)
-    bg:SetVertexColor(0.2, 0.2, 0.2, 0.5)    
+    local texture = (LSM and LSM:Fetch('statusbar', db.profile.texture)) or DEFAULT_STATUSBAR_TEXTURE
+    normal:SetStatusBarTexture(texture)
+    rested:SetStatusBarTexture(texture)
+    bg:SetTexture(texture)
+    bg:SetVertexColor(0.2, 0.2, 0.2, 0.5)
 end
 
 function mExperience:UpdateLayout()
-	mXP:SetWidth(db.profile.width);
-	mXP:SetHeight(db.profile.height);
-	mXP:ClearAllPoints();
+    mXP:SetWidth(db.profile.width);
+    mXP:SetHeight(db.profile.height);
+    mXP:ClearAllPoints();
     mXP:SetPoint(db.profile.anchor,
                       UIParent,
                       db.profile.anchor,
                       db.profile.xOffset,
                       db.profile.yOffset );
-	mXP:SetAlpha(db.profile.alpha);
-	mXP:SetScale(db.profile.scale);
+    mXP:SetAlpha(db.profile.alpha);
+    mXP:SetScale(db.profile.scale);
 end
 
 function mExperience:UpdateBarSettings()	--Stuff that really only needs to be touched when some settings change.
     --Height & Width & Location
     ---------------------------
     self:UpdateLayout();
-	--Texture
+    --Texture
     ---------------------------
     self:UpdateTexture();
-    
-	--Colors
+
+    --Colors
     ---------------------------
     self:UpdateColors();
 
@@ -394,4 +396,3 @@ function mExperience:UpdateBarSettings()	--Stuff that really only needs to be to
         )
     end;
 end
-
